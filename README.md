@@ -1,6 +1,6 @@
-# GigaSSL Reproduction
+# Self-supervised learning to predict intrahepatic cholangiocarcinoma transcriptomic classes on routine histology
 
-Clean, standalone reproduction of GigaSSL linear probing experiments.
+Reproduction of the results present in the paper [Self-supervised learning to predict intrahepatic cholangiocarcinoma transcriptomic classes on routine histology](https://www.biorxiv.org/content/10.1101/2024.01.15.575652v1)
 
 ## Prerequisites
 
@@ -12,7 +12,7 @@ You will need [uv](https://docs.astral.sh/uv/getting-started/installation/) to r
 
 ```bash
 # 1. Clone this repository and navigate to it
-cd icca_reproduction_code
+cd ICCA_prediction
 
 # 2. Install dependencies
 uv sync
