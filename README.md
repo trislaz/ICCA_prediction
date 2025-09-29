@@ -12,7 +12,7 @@ You will need [uv](https://docs.astral.sh/uv/getting-started/installation/) to r
 
 ```bash
 # 1. Clone this repository and navigate to it
-cd icca_reproduction_code
+cd ICCA_prediction
 
 # 2. Install dependencies
 uv sync
