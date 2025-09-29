@@ -1,0 +1,13 @@
+[project]
+name = "icca-reproduction-code"
+version = "0.1.0"
+description = "Code to reproduce the results from the paper : 'Self-supervised learning to predict intrahepatic cholangiocarcinoma transcriptomic classes on routine histology'"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "gdown>=5.2.0",
+    "openpyxl>=3.1.5",
+    "rich>=14.1.0",
+    "scikit-learn>=1.7.2",
+    "seaborn>=0.13.2",
+]
