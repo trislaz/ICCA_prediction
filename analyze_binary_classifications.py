@@ -255,6 +255,42 @@ def analyze_per_class_errors(df: pd.DataFrame, dataset: str = None) -> pd.DataFr
     return pd.DataFrame(results)
 
 
+def count_wrongly_predicted_positives(df: pd.DataFrame, dataset: str = None) -> pd.DataFrame:
+    """
+    Count slides that were wrongly predicted as positive (False Positives).
+    For each (true_label, predicted_as) pair, count the number of slides.
+
+    Returns: DataFrame with columns [true_label, predicted_as, count, slide_ids]
+    """
+    if dataset is not None:
+        df = df[df['dataset_valid'] == dataset].copy()
+
+    # Get true labels
+    true_labels = get_true_label_per_slide(df)
+
+    # Merge true labels with predictions
+    df_with_true = df.merge(true_labels[['ID', 'true_label']], on='ID', how='left')
+
+    # Find False Positives: predicted=1 but binary_class != true_label
+    false_positives = df_with_true[
+        (df_with_true['predicted'] == 1) &
+        (df_with_true['binary_class'] != df_with_true['true_label'])
+    ].copy()
+
+    # Group by true_label and predicted_as (binary_class)
+    results = []
+    for (true_label, predicted_as), group in false_positives.groupby(['true_label', 'binary_class']):
+        slide_ids = group['ID'].unique().tolist()
+        results.append({
+            'true_label': true_label,
+            'predicted_as': predicted_as,
+            'count': len(slide_ids),
+            'slide_ids': ', '.join(slide_ids[:5])  # Show first 5 slides
+        })
+
+    return pd.DataFrame(results)
+
+
 def main():
     console.print(Panel.fit(
         "[bold cyan]BINARY CLASSIFICATION ANALYSIS[/bold cyan]\n"
@@ -373,10 +409,73 @@ def main():
     console.print()
 
     # ========================================
-    # 3. FALSE POSITIVE MISCLASSIFICATION MATRIX
+    # 3. WRONGLY PREDICTED POSITIVE SLIDES (by True Label)
+    # ========================================
+    console.print(Panel("[bold]WRONGLY PREDICTED POSITIVE SLIDES[/bold]", border_style="blue"))
+    console.print("[dim]Count of slides wrongly predicted as positive, grouped by their true label[/dim]")
+    console.print()
+
+    # Overall
+    console.print("[bold cyan]Overall (All Datasets)[/bold cyan]")
+    wrong_positive_overall = count_wrongly_predicted_positives(df)
+
+    if len(wrong_positive_overall) > 0:
+        # Sort by true_label and count
+        wrong_positive_overall = wrong_positive_overall.sort_values(['true_label', 'count'], ascending=[True, False])
+
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("True Label", style="yellow")
+        table.add_column("Wrongly Predicted As", style="red")
+        table.add_column("# Slides", style="red", justify="right")
+        table.add_column("Example Slide IDs", style="dim")
+
+        for _, row in wrong_positive_overall.iterrows():
+            true_label_str = str(row['true_label']) if pd.notna(row['true_label']) else '<no_label>'
+            table.add_row(
+                true_label_str,
+                row['predicted_as'],
+                str(row['count']),
+                row['slide_ids'][:80]  # Truncate if too long
+            )
+
+        console.print(table)
+    else:
+        console.print("[green]No false positives found![/green]")
+    console.print()
+
+    # Per-dataset
+    all_wrong_positives = {'overall': wrong_positive_overall}
+    for dataset in sorted(df['dataset_valid'].unique()):
+        console.print(f"[bold cyan]{dataset.upper()} Dataset[/bold cyan]")
+        wrong_positive_ds = count_wrongly_predicted_positives(df, dataset=dataset)
+        all_wrong_positives[dataset] = wrong_positive_ds
+
+        if len(wrong_positive_ds) > 0:
+            wrong_positive_ds = wrong_positive_ds.sort_values(['true_label', 'count'], ascending=[True, False])
+
+            table = Table(show_header=True, header_style="bold cyan")
+            table.add_column("True Label", style="yellow")
+            table.add_column("Wrongly Predicted As", style="red")
+            table.add_column("# Slides", style="red", justify="right")
+
+            for _, row in wrong_positive_ds.iterrows():
+                true_label_str = str(row['true_label']) if pd.notna(row['true_label']) else '<no_label>'
+                table.add_row(
+                    true_label_str,
+                    row['predicted_as'],
+                    str(row['count'])
+                )
+
+            console.print(table)
+        else:
+            console.print("[green]No false positives found![/green]")
+        console.print()
+
+    # ========================================
+    # 4. FALSE POSITIVE MISCLASSIFICATION MATRIX
     # ========================================
     console.print(Panel("[bold]FALSE POSITIVE MISCLASSIFICATION MATRIX[/bold]", border_style="blue"))
-    console.print("[dim]Rows: True label | Columns: What was falsely predicted as positive | Values: Count of FPs[/dim]")
+    console.print("[dim]Rows: True label | Columns: What was falsely predicted as positive | Values: Count of predictions (not slides)[/dim]")
     console.print()
 
     # Overall
@@ -413,7 +512,7 @@ def main():
         console.print()
 
     # ========================================
-    # 4. SLIDES NEVER PREDICTED POSITIVE
+    # 5. SLIDES NEVER PREDICTED POSITIVE
     # ========================================
     console.print(Panel("[bold]SLIDES NEVER PREDICTED AS POSITIVE[/bold]", border_style="blue"))
 
@@ -474,7 +573,7 @@ def main():
     console.print()
 
     # ========================================
-    # 5. SAVE RESULTS
+    # 6. SAVE RESULTS
     # ========================================
     output_dir = Path('outputs/analysis')
     output_dir.mkdir(exist_ok=True)
@@ -494,6 +593,12 @@ def main():
         if dataset != 'overall':
             misclass_df.to_csv(output_dir / f'misclassifications_per_slide_{dataset}.csv', index=False)
 
+    # Save wrongly predicted positives
+    wrong_positive_overall.to_csv(output_dir / 'wrongly_predicted_positive_slides_overall.csv', index=False)
+    for dataset, wrong_pos_df in all_wrong_positives.items():
+        if dataset != 'overall':
+            wrong_pos_df.to_csv(output_dir / f'wrongly_predicted_positive_slides_{dataset}.csv', index=False)
+
     # Save FP matrices
     fp_matrix_overall.to_csv(output_dir / 'fp_misclassification_matrix_overall.csv')
     for dataset, fp_matrix in all_fp_matrices.items():
@@ -510,6 +615,7 @@ def main():
         "[bold green]Results saved to outputs/analysis/[/bold green]\n\n"
         "  [cyan]•[/cyan] per_class_metrics_*.csv: Performance metrics per binary classifier\n"
         "  [cyan]•[/cyan] misclassifications_per_slide_*.csv: Error counts per slide\n"
+        "  [cyan]•[/cyan] wrongly_predicted_positive_slides_*.csv: Slides wrongly predicted as positive by true label\n"
         "  [cyan]•[/cyan] fp_misclassification_matrix_*.csv: FP confusion patterns\n"
         "  [cyan]•[/cyan] never_positive_slides_*.csv: Slides never predicted positive",
         border_style="green"
