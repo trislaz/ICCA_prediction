@@ -9,6 +9,7 @@ You will need [uv](https://docs.astral.sh/uv/getting-started/installation/) to r
 ## Quick Start - Run Complete Pipeline
 
 **The easiest way to reproduce all results:**
+The whole pipeline only takes a few minutes to run on a classical laptop.
 
 ```bash
 # 1. Clone this repository and navigate to it
